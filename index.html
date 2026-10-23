@@ -13,7 +13,7 @@ h1{text-align:center;font-size:18px;margin:6px 0 4px}
 button{border:1px solid #f5a623;background:#fff;color:#c07a00;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;margin-left:6px}
 button:active{background:#fff3d6}
 
-/* 核心布局：三栏自适应网格 */
+/* 核心布局：双栏自适应 */
 .wrap{display:grid;grid-template-columns:repeat(2, 1fr);gap:15px}
 @media(min-width: 1200px) {
   .wrap{grid-template-columns:repeat(3, 1fr);}
@@ -22,7 +22,7 @@ button:active{background:#fff3d6}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图 (绝对保持原样) ===== */
+/* ===== 柱状图 ===== */
 .chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
 .chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
 .chart-bars{display:flex;align-items:stretch;height:400px;gap:3px;position:relative}
@@ -61,7 +61,7 @@ tr:nth-child(even){background:#fafafa}
 <div class="bar">数据更新时间：<b id="ts">--</b> <button onclick="loadAll()">刷新</button></div>
 
 <div class="wrap">
-  <!-- 模块1：两市成交额 (原样保留) -->
+  <!-- 模块1：两市成交额 -->
   <div class="card">
     <h3>两市成交额（亿元）</h3>
     <div class="chart-box">
@@ -72,7 +72,7 @@ tr:nth-child(even){background:#fafafa}
     <tbody id="tbV"><tr><td colspan="5" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 模块2：两市融资余额 (原样保留) -->
+  <!-- 模块2：两市融资余额 -->
   <div class="card">
     <h3>两市融资余额（亿元）</h3>
     <div class="chart-box">
@@ -83,7 +83,7 @@ tr:nth-child(even){background:#fafafa}
     <tbody id="tbM"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 模块3：北向资金 (按原样代码结构新加) -->
+  <!-- 模块3：北向资金（已修复接口） -->
   <div class="card">
     <h3>北向资金净流入（亿元）</h3>
     <div class="chart-box">
@@ -203,19 +203,41 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-// 4. 北向资金 (陆股通净买入)
-var NORTH_URL = 'https://datacenter-web.eastmoney.com/api/data/v1/get'
-  + '?reportName=RPT_MUTUAL_DEAL_HISTORY&columns=TRADE_DATE,NET_DEAL_AMT&source=WEB'
-  + '&sortColumns=TRADE_DATE&sortTypes=-1&pageSize=25&pageNumber=1';
+// 4. 北向资金 (替换为真实有效的接口：陆股通每日成交净买额)
+var NORTH_URL = 'https://data.eastmoney.com/hsgtcg/GetHsgtData?type=1&pageSize=15';
 
 function parseNorth(d){
-  var rows = (d && d.result && d.result.data) || [];
   var out = [];
+  // 兼容不同接口返回的数据结构
+  var rows = [];
+  if(d && d.Data && d.Data.History){
+    rows = d.Data.History;
+  } else if (d && Array.isArray(d)){
+    rows = d;
+  }
+
   for(var i=0;i<rows.length;i++){
     var r = rows[i];
-    var date = r.TRADE_DATE || r.trade_date || '';
-    var v = (r.NET_DEAL_AMT!=null)?r.NET_DEAL_AMT:(r.net_deal_amt!=null?r.net_deal_amt:null);
-    if(date && v!=null) out.push({date:String(date).slice(0,10), val:parseFloat(v)/yi});
+    var date = '';
+    var v = 0;
+    
+    // 提取日期和净买入额
+    if(r.SHDAY && typeof r.NBDJJ === 'number'){
+      date = String(r.SHDAY); // 接口1格式：SHDAY="20230720", NBDJJ=净买入额(单位:万)
+      v = r.NBDJJ / 10000;   // 转换为亿
+    } else if(r.tradeDate && typeof r.netBuy === 'number'){
+      date = String(r.tradeDate); // 接口2格式
+      v = r.netBuy;
+    } else if(r.TRADE_DATE && typeof r.NET_DEAL_AMT === 'number'){
+      date = String(r.TRADE_DATE).replace(/-/g, '').slice(0,8);
+      v = r.NET_DEAL_AMT / 10000;
+    }
+
+    if(date && date.length >= 8) {
+      // 格式化日期为 YYYY-MM-DD
+      var y = date.slice(0,4), m = date.slice(4,6), d = date.slice(6,8);
+      out.push({date: y+'-'+m+'-'+d, val: v});
+    }
   }
   return out;
 }
@@ -237,7 +259,7 @@ async function loadNorth(){
 
 // ---------------- 渲染逻辑 ----------------
 
-function drawChart(containerId, yId, rows, key){
+function drawChart(containerId, yId, rows, key, isNorth){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
   var take = rows.slice(-15);
@@ -246,10 +268,10 @@ function drawChart(containerId, yId, rows, key){
   var vals = take.map(function(r){ return r[key]; });
   var max = 0;
   for(var i=0;i<vals.length;i++){ if(vals[i]!=null && vals[i]>max) max=vals[i]; }
-  var roundTo = (key === 'total') ? 5000 : (key === 'val' && yId === 'yN' ? 20 : 500);
+  var roundTo = (key === 'total') ? 5000 : (isNorth ? 20 : 500);
   max = Math.ceil(max / roundTo) * roundTo;
+  if(max === 0) max = roundTo;
 
-  // Y轴刻度 (北向资金如果有负数会自动扩展，正常显示)
   var yHtml = '';
   var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
@@ -260,8 +282,10 @@ function drawChart(containerId, yId, rows, key){
     var r = take[i];
     var prev = (i > 0) ? take[i-1][key] : null;
     var pct = (r[key]!=null && max>0) ? (r[key]/max*100) : 0;
-    // 北向资金流入红、流出绿；其他资金涨红跌绿
-    var color = (yId === 'yN') ? (r[key]>=0 ? COLOR_UP : COLOR_DOWN) : barColor(r[key], prev);
+    
+    // 颜色逻辑：北向资金流入为红，流出为绿
+    var color = isNorth ? (r[key]>=0 ? COLOR_UP : COLOR_DOWN) : barColor(r[key], prev);
+    
     var tipText = r.date + '：' + fmt(r[key]) + '亿';
 
     html += '<div class="chart-bar" title="'+tipText+'">';
@@ -289,7 +313,7 @@ function renderVolume(shH, szH, today){
   }
   
   CACHE_VOLUME = rows;
-  drawChart('chartV', 'yV', rows, 'total');
+  drawChart('chartV', 'yV', rows, 'total', false);
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -304,7 +328,7 @@ function renderMargin(list){
   if(!list || !list.length) return;
   var rows = list.slice().reverse();
   CACHE_MARGIN = rows;
-  drawChart('chartM', 'yM', rows, 'val');
+  drawChart('chartM', 'yM', rows, 'val', false);
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -319,7 +343,8 @@ function renderNorth(list){
   if(!list || !list.length) return;
   var rows = list.slice().reverse();
   CACHE_NORTH = rows;
-  drawChart('chartN', 'yN', rows, 'val');
+  // 第三个参数 true 代表是北向资金，走特殊的红涨绿跌渲染
+  drawChart('chartN', 'yN', rows, 'val', true);
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -334,7 +359,7 @@ function renderNorth(list){
 function renderCache(){
   if(CACHE_VOLUME) {
     var rows = CACHE_VOLUME.slice();
-    drawChart('chartV', 'yV', rows, 'total');
+    drawChart('chartV', 'yV', rows, 'total', false);
     rows.reverse();
     var h='';
     for(var i=0;i<rows.length;i++){
@@ -346,7 +371,7 @@ function renderCache(){
   }
   if(CACHE_MARGIN) {
     var mRows = CACHE_MARGIN.slice();
-    drawChart('chartM', 'yM', mRows, 'val');
+    drawChart('chartM', 'yM', mRows, 'val', false);
     mRows.reverse();
     var h='';
     for(var i=0;i<mRows.length;i++){
@@ -358,7 +383,7 @@ function renderCache(){
   }
   if(CACHE_NORTH) {
     var nRows = CACHE_NORTH.slice();
-    drawChart('chartN', 'yN', nRows, 'val');
+    drawChart('chartN', 'yN', nRows, 'val', true);
     nRows.reverse();
     var h='';
     for(var i=0;i<nRows.length;i++){
