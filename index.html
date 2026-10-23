@@ -16,52 +16,68 @@ button:active{background:#fff3d6}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图：Grid三行布局 ===== */
+/* ===== 柱状图：纯Flex布局，极致兼容 ===== */
 .chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
 .chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
 
-/* 图表区：数值行 + 柱子行 + 日期行 */
 .chart-bars{
-  display:grid;
-  grid-template-rows: 20px 400px 22px;
-  gap:4px;
+  display:flex;
+  align-items:stretch;
+  height:400px;
+  gap:2px;
   position:relative;
 }
 
-/* 每一列（一个日期） */
-.chart-bar{display:contents;cursor:pointer}
-.chart-bar:hover .bar-fill{opacity:.75}
+/* 每一根柱子（包含数值、柱体、日期） */
+.chart-bar{
+  flex:1; /* 15根柱子平分宽度，绝不变宽 */
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  min-width:0;
+  cursor:pointer;
+  position:relative;
+}
+.chart-bar:hover{opacity:.8}
 
-/* 顶部：数值 */
+/* 顶部数值 */
 .chart-bar .bar-val{
+  height:20px;
+  display:flex;align-items:flex-end;justify-content:center;
   font-size:11px;color:#333;font-weight:600;white-space:nowrap;
-  text-align:center;align-self:end;padding-bottom:2px;
 }
 
-/* 中间：柱子区域 */
+/* 中间柱体区域 */
 .chart-bar .bar-area{
-  position:relative;width:100%;align-self:stretch;
+  flex:1;
+  display:flex;align-items:flex-end;justify-content:center;
+  position:relative;
 }
 
-/* 柱子本体 */
+/* 柱子本身 */
 .chart-bar .bar-fill{
-  width:100%;border-radius:3px 3px 0 0;position:absolute;bottom:0;min-height:2px;
+  width:100%;
+  border-radius:3px 3px 0 0;
+  min-height:1px;
 }
 
-/* 底部：日期 */
+/* 底部日期 */
 .chart-bar .bar-date{
-  font-size:10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  text-align:center;align-self:start;
+  height:22px;
+  display:flex;align-items:flex-start;justify-content:center;
+  font-size:10px;color:#888;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;
 }
 
-/* Y轴刻度 */
+/* Y轴刻度（贴在最左侧） */
 .chart-ylabels{
-  position:absolute;left:0;top:24px;bottom:26px;
+  position:absolute;left:0;top:0;bottom:22px;
   display:flex;flex-direction:column;justify-content:space-between;
-  font-size:11px;color:#999;pointer-events:none;z-index:1;
+  font-size:11px;color:#999;pointer-events:none;z-index:10;
 }
-.chart-ylabels span{transform:translateX(-4px)}
+.chart-ylabels span{transform:translateX(-6px)}
 
+/* 表格部分 */
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#fff8e1;padding:7px 3px;text-align:center;font-weight:600;border-bottom:2px solid #f5a623;white-space:nowrap}
 td{padding:6px 3px;text-align:center;border-bottom:1px solid #eee;white-space:nowrap}
@@ -73,11 +89,12 @@ tr:nth-child(even){background:#fafafa}
 .err{color:#e53935}
 .loading{color:#999}
 
+/* 手机端适配 */
 @media(max-width:700px){
   .wrap{grid-template-columns:1fr}
-  .chart-bars{grid-template-rows:16px 300px 18px}
-  .chart-bar .bar-val{font-size:9px}
-  .chart-bar .bar-date{font-size:9px}
+  .chart-bars{height:300px}
+  .chart-bar .bar-val{font-size:9px;height:16px}
+  .chart-bar .bar-date{font-size:9px;height:18px}
 }
 </style>
 </head>
@@ -87,6 +104,7 @@ tr:nth-child(even){background:#fafafa}
 <div class="bar">更新时间：<b id="ts">--</b> <button onclick="loadAll()">刷新</button></div>
 
 <div class="wrap">
+  <!-- 成交额 -->
   <div class="card">
     <h3>两市成交额（亿元）</h3>
     <div class="chart-box">
@@ -97,6 +115,7 @@ tr:nth-child(even){background:#fafafa}
     <tbody id="tbV"><tr><td colspan="5" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
+  <!-- 融资余额 -->
   <div class="card">
     <h3>两市融资余额（亿元）</h3>
     <div class="chart-box">
@@ -207,11 +226,13 @@ function drawChart(containerId, yId, rows, key){
   var roundTo = (key === 'total') ? 5000 : 500;
   max = Math.ceil(max / roundTo) * roundTo;
 
+  // Y轴刻度
   var yHtml = '';
   var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
   yLabels.innerHTML = yHtml;
 
+  // 15根柱子
   var html = '';
   for(var i=0;i<take.length;i++){
     var r = take[i];
