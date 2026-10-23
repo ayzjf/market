@@ -16,29 +16,42 @@ button:active{background:#fff3d6}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图（加大高度和字体） ===== */
+/* ===== 柱状图 ===== */
 .chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
 .chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
-.chart-bars{display:flex;align-items:flex-end;height:260px;gap:4px;padding:0 6px;position:relative}
-.chart-bar{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;cursor:pointer;min-width:0}
+
+/* 柱子区域容器 */
+.chart-bars{display:flex;align-items:flex-end;height:400px;gap:4px;padding:0 6px;position:relative}
+
+/* 每个柱子整体 */
+.chart-bar{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;cursor:pointer}
 .chart-bar:hover{opacity:.75}
 
-/* 柱子上方的数值（加大字体） */
+/* 顶部数值 */
 .chart-bar .bar-val{
   font-size:11px;color:#333;font-weight:600;white-space:nowrap;
-  margin-bottom:4px;min-height:16px;line-height:16px;
+  min-height:16px;line-height:16px;margin-bottom:4px;
 }
-/* 柱子本身 */
+
+/* 柱子填充区域（独立，不和日期冲突） */
+.chart-bar .bar-area{
+  flex:1;width:100%;position:relative;display:flex;align-items:flex-end;
+  min-height:0; /* 关键：允许flex收缩 */
+}
+
+/* 柱子本体 */
 .chart-bar .bar-fill{
   width:100%;border-radius:3px 3px 0 0;position:absolute;bottom:0;min-height:3px;
 }
-/* 柱子下方的日期（加大字体） */
+
+/* 底部日期（在柱子外面，不会被盖住） */
 .chart-bar .bar-date{
   font-size:10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  max-width:100%;text-align:center;margin-top:auto;padding-top:6px;
+  max-width:100%;text-align:center;margin-top:6px;padding-top:4px;flex-shrink:0;
 }
-/* Y轴刻度（加大字体） */
-.chart-ylabels{position:absolute;left:0;top:0;bottom:26px;display:flex;flex-direction:column;
+
+/* Y轴刻度 */
+.chart-ylabels{position:absolute;left:0;top:0;bottom:24px;display:flex;flex-direction:column;
   justify-content:space-between;font-size:11px;color:#999;pointer-events:none;z-index:1}
 .chart-ylabels span{transform:translateX(-4px)}
 
@@ -47,16 +60,15 @@ th{background:#fff8e1;padding:7px 3px;text-align:center;font-weight:600;border-b
 td{padding:6px 3px;text-align:center;border-bottom:1px solid #eee;white-space:nowrap}
 tr:nth-child(even){background:#fafafa}
 .up{color:#e53935;font-weight:600}
-.down{color:#1e88e5;font-weight:600}
+.down{color:#2e7d32;font-weight:600}
 .dash{color:#bbb}
 .tip{text-align:center;font-size:11px;color:#aaa;margin-top:12px;padding:6px}
 .err{color:#e53935}
 .loading{color:#999}
 
-/* 手机端适配 */
 @media(max-width:700px){
   .wrap{grid-template-columns:1fr}
-  .chart-bars{height:200px}
+  .chart-bars{height:300px}
   .chart-bar .bar-val{font-size:9px}
   .chart-bar .bar-date{font-size:9px}
 }
@@ -68,27 +80,21 @@ tr:nth-child(even){background:#fafafa}
 <div class="bar">更新时间：<b id="ts">--</b> <button onclick="loadAll()">刷新</button></div>
 
 <div class="wrap">
-  <!-- 成交额 -->
   <div class="card">
     <h3>两市成交额（亿元）</h3>
     <div class="chart-box">
       <div class="chart-title">近15日成交额趋势</div>
-      <div class="chart-bars" id="chartV">
-        <div class="chart-ylabels" id="yV"></div>
-      </div>
+      <div class="chart-bars" id="chartV"><div class="chart-ylabels" id="yV"></div></div>
     </div>
     <table><thead><tr><th>日期</th><th>沪市</th><th>深市</th><th>合计</th><th>相比上日</th></tr></thead>
     <tbody id="tbV"><tr><td colspan="5" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 融资余额 -->
   <div class="card">
     <h3>两市融资余额（亿元）</h3>
     <div class="chart-box">
       <div class="chart-title">近15日融资余额趋势</div>
-      <div class="chart-bars" id="chartM">
-        <div class="chart-ylabels" id="yM"></div>
-      </div>
+      <div class="chart-bars" id="chartM"><div class="chart-ylabels" id="yM"></div></div>
     </div>
     <table><thead><tr><th>日期</th><th>融资余额</th><th>相比上日</th></tr></thead>
     <tbody id="tbM"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
@@ -99,11 +105,10 @@ tr:nth-child(even){background:#fafafa}
 
 <script>
 var yi = 100000000;
-var COLOR_UP = '#e53935';     // 涨 → 红
-var COLOR_DOWN = '#2e7d32';   // 跌 → 绿
-var COLOR_FLAT = '#9e9e9e';   // 平 → 灰
+var COLOR_UP = '#e53935';
+var COLOR_DOWN = '#2e7d32';
+var COLOR_FLAT = '#9e9e9e';
 
-/* ---------- JSONP ---------- */
 function jsonp(url, cbName, timeout){
   cbName = cbName || 'cb'; timeout = timeout || 10000;
   return new Promise(function(resolve, reject){
@@ -130,7 +135,6 @@ function barColor(cur, prev){
   return d>0 ? COLOR_UP : (d<0 ? COLOR_DOWN : COLOR_FLAT);
 }
 
-/* ---------- 实时成交额 ---------- */
 async function loadRealtimeVolume(){
   var url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=1.000001,0.399106&fields=f6,f12,f14';
   var d = await jsonp(url, 'cb');
@@ -143,7 +147,6 @@ async function loadRealtimeVolume(){
   return { sh:sh==null?null:sh/yi, sz:sz==null?null:sz/yi };
 }
 
-/* ---------- 成交额历史 ---------- */
 async function loadVolumeHistory(secid){
   var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid='+secid
           + '&fields1=f1,f2,f3&fields2=f51,f57&klt=101&fqt=1&end=20500101&lmt=25';
@@ -154,7 +157,6 @@ async function loadVolumeHistory(secid){
   return out;
 }
 
-/* ---------- 融资余额 ---------- */
 var MARGIN_URL = 'https://datacenter-web.eastmoney.com/api/data/v1/get'
   + '?reportName=RPTA_RZRQ_LSHJ&columns=DIM_DATE,RZYE&source=WEB'
   + '&sortColumns=DIM_DATE&sortTypes=-1&pageSize=25&pageNumber=1';
@@ -186,48 +188,43 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-/* ---------- 通用：画柱状图（红涨绿跌） ---------- */
+/* ===== 画柱状图（拆分为：数值 + 柱子区域 + 日期，三层不重叠） ===== */
 function drawChart(containerId, yId, rows, key){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
-  var take = rows.slice(-15); // 取最近15条
+  var take = rows.slice(-15);
   if(!take.length){ container.innerHTML='<div style="text-align:center;padding:30px;color:#ccc">暂无数据</div>'; yLabels.innerHTML=''; return; }
 
   var vals = take.map(function(r){ return r[key]; });
-  var max = 0, min = Infinity;
-  for(var i=0;i<vals.length;i++){
-    if(vals[i]!=null && vals[i]>max) max=vals[i];
-    if(vals[i]!=null && vals[i]<min) min=vals[i];
-  }
-  // 最大值向上取整到500的倍数（融资余额）或5000的倍数（成交额）
-  var roundTo = (key === 'total') ? 5000 : 1000;
+  var max = 0;
+  for(var i=0;i<vals.length;i++){ if(vals[i]!=null && vals[i]>max) max=vals[i]; }
+  var roundTo = (key === 'total') ? 5000 : 500;
   max = Math.ceil(max / roundTo) * roundTo;
-  if(min === Infinity) min = 0;
 
-  // Y轴刻度
   var yHtml = '';
   var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
   yLabels.innerHTML = yHtml;
 
-  // 柱子
   var html = '';
   for(var i=0;i<take.length;i++){
     var r = take[i];
     var prev = (i > 0) ? take[i-1][key] : null;
     var pct = (r[key]!=null && max>0) ? (r[key]/max*100) : 0;
     var color = barColor(r[key], prev);
-    var tipText = r.date + ' ' + key + '：' + fmt(r[key]) + '亿';
+    var tipText = r.date + '：' + fmt(r[key]) + '亿';
+
     html += '<div class="chart-bar" title="'+tipText+'">';
     html += '  <div class="bar-val">'+(r[key]!=null?fmt(r[key]):'—')+'</div>';
-    html += '  <div class="bar-fill" style="height:'+pct+'%;background:'+color+'"></div>';
+    html += '  <div class="bar-area">';
+    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'"></div>';
+    html += '  </div>';
     html += '  <div class="bar-date">'+r.date.slice(5)+'</div>';
     html += '</div>';
   }
   container.innerHTML = html;
 }
 
-/* ---------- 渲染成交额 ---------- */
 function renderVolume(shH, szH, today){
   var n=Math.max(shH.length, szH.length), rows=[];
   for(var i=0;i<n;i++){
@@ -251,14 +248,13 @@ function renderVolume(shH, szH, today){
   document.getElementById('tbV').innerHTML = h || '<tr><td colspan="5" class="err">暂无数据</td></tr>';
 }
 
-/* ---------- 渲染融资余额 ---------- */
 function renderMargin(list){
   if(!list || !list.length){
     document.getElementById('tbM').innerHTML='<tr><td colspan="3" class="err">暂无数据</td></tr>'; return;
   }
-  var rows = list.slice().reverse(); // 旧→新
+  var rows = list.slice().reverse();
   drawChart('chartM', 'yM', rows, 'val');
-  rows.reverse(); // 最新在上
+  rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
@@ -268,7 +264,6 @@ function renderMargin(list){
   document.getElementById('tbM').innerHTML=h;
 }
 
-/* ---------- 主流程 ---------- */
 async function loadAll(){
   var tip=document.getElementById('tip'), errs=[];
   try{
