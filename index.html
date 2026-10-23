@@ -16,17 +16,31 @@ button:active{background:#fff3d6}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图 ===== */
-.chart-box{padding:12px 8px 4px;border-bottom:1px solid #eee}
-.chart-title{text-align:center;font-size:12px;color:#888;margin-bottom:6px}
-.chart-bars{display:flex;align-items:flex-end;height:160px;gap:3px;padding:0 4px;position:relative}
-.chart-bar{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;cursor:pointer;border-radius:2px 2px 0 0;transition:opacity .15s;min-width:0}
-.chart-bar:hover{opacity:.7}
-.chart-bar .bar-fill{width:100%;border-radius:2px 2px 0 0;position:absolute;bottom:0;min-height:2px}
-.chart-bar .bar-val{font-size:9px;color:#666;white-space:nowrap;margin-bottom:2px}
-.chart-bar .bar-date{font-size:9px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center;margin-top:auto;padding-top:2px}
-.chart-ylabels{position:absolute;left:0;top:0;bottom:18px;display:flex;flex-direction:column;justify-content:space-between;font-size:9px;color:#ccc;pointer-events:none}
-.chart-ylabels span{transform:translateX(-2px)}
+/* ===== 柱状图（加大高度和字体） ===== */
+.chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
+.chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
+.chart-bars{display:flex;align-items:flex-end;height:260px;gap:4px;padding:0 6px;position:relative}
+.chart-bar{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;cursor:pointer;min-width:0}
+.chart-bar:hover{opacity:.75}
+
+/* 柱子上方的数值（加大字体） */
+.chart-bar .bar-val{
+  font-size:11px;color:#333;font-weight:600;white-space:nowrap;
+  margin-bottom:4px;min-height:16px;line-height:16px;
+}
+/* 柱子本身 */
+.chart-bar .bar-fill{
+  width:100%;border-radius:3px 3px 0 0;position:absolute;bottom:0;min-height:3px;
+}
+/* 柱子下方的日期（加大字体） */
+.chart-bar .bar-date{
+  font-size:10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:100%;text-align:center;margin-top:auto;padding-top:6px;
+}
+/* Y轴刻度（加大字体） */
+.chart-ylabels{position:absolute;left:0;top:0;bottom:26px;display:flex;flex-direction:column;
+  justify-content:space-between;font-size:11px;color:#999;pointer-events:none;z-index:1}
+.chart-ylabels span{transform:translateX(-4px)}
 
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#fff8e1;padding:7px 3px;text-align:center;font-weight:600;border-bottom:2px solid #f5a623;white-space:nowrap}
@@ -38,7 +52,14 @@ tr:nth-child(even){background:#fafafa}
 .tip{text-align:center;font-size:11px;color:#aaa;margin-top:12px;padding:6px}
 .err{color:#e53935}
 .loading{color:#999}
-@media(max-width:700px){.wrap{grid-template-columns:1fr}.chart-bars{height:130px}}
+
+/* 手机端适配 */
+@media(max-width:700px){
+  .wrap{grid-template-columns:1fr}
+  .chart-bars{height:200px}
+  .chart-bar .bar-val{font-size:9px}
+  .chart-bar .bar-date{font-size:9px}
+}
 </style>
 </head>
 <body>
@@ -78,13 +99,9 @@ tr:nth-child(even){background:#fafafa}
 
 <script>
 var yi = 100000000;
-var COLOR_UP = '#e53935';    // 涨 → 红
-var COLOR_DOWN = '#1e88e5';   // 跌 → 蓝（A股习惯，绿也可以，下面可改）
+var COLOR_UP = '#e53935';     // 涨 → 红
+var COLOR_DOWN = '#2e7d32';   // 跌 → 绿
 var COLOR_FLAT = '#9e9e9e';   // 平 → 灰
-
-/* 如果你想用 A 股经典红涨绿跌，把上面第二行改成：
-   var COLOR_DOWN = '#2e7d32';   // 跌 → 绿
-*/
 
 /* ---------- JSONP ---------- */
 function jsonp(url, cbName, timeout){
@@ -177,11 +194,17 @@ function drawChart(containerId, yId, rows, key){
   if(!take.length){ container.innerHTML='<div style="text-align:center;padding:30px;color:#ccc">暂无数据</div>'; yLabels.innerHTML=''; return; }
 
   var vals = take.map(function(r){ return r[key]; });
-  var max = 0;
-  for(var i=0;i<vals.length;i++){ if(vals[i]!=null && vals[i]>max) max=vals[i]; }
-  max = Math.ceil(max / 5000) * 5000;
+  var max = 0, min = Infinity;
+  for(var i=0;i<vals.length;i++){
+    if(vals[i]!=null && vals[i]>max) max=vals[i];
+    if(vals[i]!=null && vals[i]<min) min=vals[i];
+  }
+  // 最大值向上取整到500的倍数（融资余额）或5000的倍数（成交额）
+  var roundTo = (key === 'total') ? 5000 : 1000;
+  max = Math.ceil(max / roundTo) * roundTo;
+  if(min === Infinity) min = 0;
 
-  // Y轴
+  // Y轴刻度
   var yHtml = '';
   var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
@@ -217,8 +240,8 @@ function renderVolume(shH, szH, today){
     var last=rows[rows.length-1];
     if(last && last.date===t.date) rows[rows.length-1]=t; else rows.push(t);
   }
-  drawChart('chartV', 'yV', rows, 'total'); // 柱状图（旧→新，红涨绿跌）
-  rows.reverse(); // 表格：最新在上
+  drawChart('chartV', 'yV', rows, 'total');
+  rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].total:null, df=diff(r.total, prev);
@@ -233,11 +256,9 @@ function renderMargin(list){
   if(!list || !list.length){
     document.getElementById('tbM').innerHTML='<tr><td colspan="3" class="err">暂无数据</td></tr>'; return;
   }
-  // list 是新→旧，反转成旧→新给柱状图用
-  var rows = list.slice().reverse();
+  var rows = list.slice().reverse(); // 旧→新
   drawChart('chartM', 'yM', rows, 'val');
-  // 表格：再反转回来，最新在上
-  rows.reverse();
+  rows.reverse(); // 最新在上
   var h='';
   for(var i=0;i<rows.length;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
