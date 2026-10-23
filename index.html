@@ -160,10 +160,10 @@ async function loadRealtimeVolume(){
   return { sh:sh==null?null:sh/yi, sz:sz==null?null:sz/yi };
 }
 
-// 2. 成交额历史
+// 2. 成交额历史 (抓取20条)
 async function loadVolumeHistory(secid){
   var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid='+secid
-          + '&fields1=f1,f2,f3&fields2=f51,f57&klt=101&fqt=1&end=20500101&lmt=25';
+          + '&fields1=f1,f2,f3&fields2=f51,f57&klt=101&fqt=1&end=20500101&lmt=20';
   var d = await jsonpRetry(url, 'cb');
   var k = (d && d.data && d.data.klines) || [];
   var out=[];
@@ -171,10 +171,10 @@ async function loadVolumeHistory(secid){
   return out;
 }
 
-// 3. 融资余额
+// 3. 融资余额 (抓取20条)
 var MARGIN_URL = 'https://datacenter-web.eastmoney.com/api/data/v1/get'
   + '?reportName=RPTA_RZRQ_LSHJ&columns=DIM_DATE,RZYE&source=WEB'
-  + '&sortColumns=DIM_DATE&sortTypes=-1&pageSize=25&pageNumber=1';
+  + '&sortColumns=DIM_DATE&sortTypes=-1&pageSize=20&pageNumber=1';
 
 function parseMargin(d){
   var rows = (d && d.result && d.result.data) || [];
@@ -203,37 +203,35 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-// 4. 北向资金 (纯内嵌真实模拟数据，已扩充至20天以上)
-function loadNorth(){
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      // 模拟近20日极像真实的行情（含红涨绿跌）
-      var mockData = [
-        {"date": "2026-10-23", "val": -12.30},
-        {"date": "2026-10-22", "val": -48.56},
-        {"date": "2026-10-21", "val": 25.41},
-        {"date": "2026-10-20", "val": 88.73},
-        {"date": "2026-10-19", "val": 15.82},
-        {"date": "2026-10-18", "val": -35.10},
-        {"date": "2026-10-17", "val": -82.25},
-        {"date": "2026-10-16", "val": 110.56},
-        {"date": "2026-10-15", "val": 45.98},
-        {"date": "2026-10-14", "val": 120.44},
-        {"date": "2026-10-13", "val": -22.88},
-        {"date": "2026-10-12", "val": 33.67},
-        {"date": "2026-10-11", "val": 66.21},
-        {"date": "2026-10-10", "val": -15.79},
-        {"date": "2026-10-09", "val": 8.95},
-        {"date": "2026-10-08", "val": -5.20},
-        {"date": "2026-09-30", "val": 42.15},
-        {"date": "2026-09-29", "val": -18.76},
-        {"date": "2026-09-28", "val": 12.33},
-        {"date": "2026-09-25", "val": 55.00}
-      ];
-      if(mockData.length) resolve(mockData);
-      else reject(new Error('mock empty'));
-    }, 300);
-  });
+// 4. 北向资金 (真实抓取20条)
+async function loadNorth(){
+  // 优先使用支持 JSONP 的东财港通历史行情接口
+  try {
+    var url = 'https://push2his.eastmoney.com/api/qt/kamt.kline/get?fields1=f1,f3,f5&fields2=f51,f52&klt=101&lmt=20';
+    var d = await jsonpRetry(url, 'cb');
+    var k = (d && d.data && d.data.s2n) || [];
+    var out = [];
+    for(var i=0;i<k.length;i++){
+      var p = String(k[i]).split(',');
+      if(p.length >= 2) out.push({date: p[0], val: parseFloat(p[1])});
+    }
+    if(out.length) return out;
+  } catch(e){}
+
+  // 备用：datacenter-web 接口 (fetch请求)
+  try {
+    var url2 = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_MUTUAL_DEAL_HISTORY&columns=ALL&source=WEB&sortColumns=TRADE_DATE&sortTypes=-1&pageSize=20&pageNumber=1&filter=(MUTUAL_TYPE%3D%22005%22)';
+    var res = await fetch(url2, {cache:'no-cache'});
+    var d2 = await res.json();
+    var rows = (d2 && d2.result && d2.result.data) || [];
+    var out2 = [];
+    for(var i=0;i<rows.length;i++){
+      out2.push({date: String(rows[i].TRADE_DATE).slice(0,10), val: rows[i].NET_DEAL_AMT});
+    }
+    if(out2.length) return out2;
+  } catch(e){}
+
+  throw new Error('北向资金获取失败');
 }
 
 // ---------------- 渲染逻辑 ----------------
@@ -241,16 +239,14 @@ function loadNorth(){
 function drawChart(containerId, yId, rows, key, isNorth){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
-  // 修改为截取最后20条
-  var take = rows.slice(-20);
-  if(!take.length){ yLabels.innerHTML=''; return; }
+  if(!rows || !rows.length){ yLabels.innerHTML=''; container.innerHTML=''; return; }
 
   // 寻找最小值和最大值（兼容北向资金的负数/零轴显示）
   var min = 0, max = 0;
-  for(var i=0;i<take.length;i++){ 
-    if(take[i][key] != null){
-      if(take[i][key] > max) max = take[i][key];
-      if(take[i][key] < min) min = take[i][key];
+  for(var i=0;i<rows.length;i++){ 
+    if(rows[i][key] != null){
+      if(rows[i][key] > max) max = rows[i][key];
+      if(rows[i][key] < min) min = rows[i][key];
     }
   }
   
@@ -269,24 +265,21 @@ function drawChart(containerId, yId, rows, key, isNorth){
   yLabels.innerHTML = yHtml;
 
   var html = '';
-  for(var i=0;i<take.length;i++){
-    var r = take[i];
-    var prev = (i > 0) ? take[i-1][key] : null;
+  for(var i=0;i<rows.length;i++){
+    var r = rows[i];
+    var prev = (i > 0) ? rows[i-1][key] : null;
     var val = r[key];
     var pct = 0;
     
-    // 如果有负数，计算相对零轴的高度
     if(totalRange !== 0 && val != null){
       pct = (val - min) / totalRange * 100;
     }
 
-    // 颜色逻辑：北向资金流入为红，流出为绿
     var color = isNorth ? (val >= 0 ? COLOR_UP : COLOR_DOWN) : barColor(val, prev);
-    
     var tipText = r.date + '：' + fmt(val) + '亿';
 
     html += '<div class="chart-bar" title="'+tipText+'">';
-    // 数字置空，保持占位
+    // 数字置空占位
     html += '  <div class="bar-val"></div>';
     html += '  <div class="bar-area" style="justify-content: flex-end; padding-bottom: 0;">';
     html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'; ' + (val<0 ? 'position:absolute; top:'+pct+'%; height:'+(100-pct)+'%; bottom:auto;' : '') + '"></div>';
@@ -314,8 +307,7 @@ function renderVolume(shH, szH, today){
   drawChart('chartV', 'yV', rows, 'total', false);
   rows.reverse();
   var h='';
-  var limit = Math.min(rows.length, 20); // 限制表格显示20条
-  for(var i=0;i<limit;i++){
+  for(var i=0;i<rows.length;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].total:null, df=diff(r.total, prev);
     h+='<tr><td>'+r.date+'</td><td>'+fmt(r.sh)+'</td><td>'+fmt(r.sz)+'</td>'
       +'<td><strong>'+fmt(r.total)+'</strong></td><td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -330,8 +322,7 @@ function renderMargin(list){
   drawChart('chartM', 'yM', rows, 'val', false);
   rows.reverse();
   var h='';
-  var limit = Math.min(rows.length, 20); // 限制表格显示20条
-  for(var i=0;i<limit;i++){
+  for(var i=0;i<rows.length;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
     h+='<tr><td>'+r.date+'</td><td><strong>'+fmt(r.val)+'</strong></td>'
       +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -346,8 +337,7 @@ function renderNorth(list){
   drawChart('chartN', 'yN', rows, 'val', true);
   rows.reverse();
   var h='';
-  var limit = Math.min(rows.length, 20); // 限制表格显示20条
-  for(var i=0;i<limit;i++){
+  for(var i=0;i<rows.length;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
     h+='<tr><td>'+r.date+'</td><td class="'+(r.val>=0?'up':'down')+'"><strong>'+fmt(r.val)+'</strong></td>'
       +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -362,8 +352,7 @@ function renderCache(){
     drawChart('chartV', 'yV', rows, 'total', false);
     rows.reverse();
     var h='';
-    var limit = Math.min(rows.length, 20); // 限制显示20条
-    for(var i=0;i<limit;i++){
+    for(var i=0;i<rows.length;i++){
       var r=rows[i], prev=(i+1<rows.length)?rows[i+1].total:null, df=diff(r.total, prev);
       h+='<tr><td>'+r.date+'</td><td>'+fmt(r.sh)+'</td><td>'+fmt(r.sz)+'</td>'
         +'<td><strong>'+fmt(r.total)+'</strong></td><td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -375,8 +364,7 @@ function renderCache(){
     drawChart('chartM', 'yM', mRows, 'val', false);
     mRows.reverse();
     var h='';
-    var limit = Math.min(mRows.length, 20); // 限制显示20条
-    for(var i=0;i<limit;i++){
+    for(var i=0;i<mRows.length;i++){
       var r=mRows[i], prev=(i+1<mRows.length)?mRows[i+1].val:null, df=diff(r.val, prev);
       h+='<tr><td>'+r.date+'</td><td><strong>'+fmt(r.val)+'</strong></td>'
         +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -388,8 +376,7 @@ function renderCache(){
     drawChart('chartN', 'yN', nRows, 'val', true);
     nRows.reverse();
     var h='';
-    var limit = Math.min(nRows.length, 20); // 限制显示20条
-    for(var i=0;i<limit;i++){
+    for(var i=0;i<nRows.length;i++){
       var r=nRows[i], prev=(i+1<nRows.length)?nRows[i+1].val:null, df=diff(r.val, prev);
       h+='<tr><td>'+r.date+'</td><td class="'+(r.val>=0?'up':'down')+'"><strong>'+fmt(r.val)+'</strong></td>'
         +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -415,7 +402,7 @@ async function loadAll(){
   try{ renderMargin(await loadMargin()); }
   catch(e){ errs.push('融资'); renderCache(); }
 
-  // 3. 加载北向资金 (直接加载本地内嵌数据，秒出)
+  // 3. 加载北向资金
   try{ renderNorth(await loadNorth()); }
   catch(e){ errs.push('北向'); renderCache(); }
   
