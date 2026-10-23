@@ -14,12 +14,15 @@ button{border:1px solid #f5a623;background:#fff;color:#c07a00;border-radius:6px;
 button:active{background:#fff3d6}
 
 /* 核心布局：三栏自适应网格 */
-.wrap{display:grid;grid-template-columns:repeat(3, 1fr);gap:15px}
+.wrap{display:grid;grid-template-columns:repeat(2, 1fr);gap:15px}
+@media(min-width: 1200px) {
+  .wrap{grid-template-columns:repeat(3, 1fr);}
+}
 
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图 ===== */
+/* ===== 柱状图 (绝对保持原样) ===== */
 .chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
 .chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
 .chart-bars{display:flex;align-items:stretch;height:400px;gap:3px;position:relative}
@@ -44,7 +47,6 @@ tr:nth-child(even){background:#fafafa}
 .err{color:#e53935}
 .loading{color:#999}
 
-@media(max-width:1200px){ .wrap{grid-template-columns:1fr 1fr;} }
 @media(max-width:800px){ 
   .wrap{grid-template-columns:1fr}
   .chart-bars{height:300px}
@@ -59,7 +61,7 @@ tr:nth-child(even){background:#fafafa}
 <div class="bar">数据更新时间：<b id="ts">--</b> <button onclick="loadAll()">刷新</button></div>
 
 <div class="wrap">
-  <!-- 模块1：两市成交额 -->
+  <!-- 模块1：两市成交额 (原样保留) -->
   <div class="card">
     <h3>两市成交额（亿元）</h3>
     <div class="chart-box">
@@ -70,7 +72,7 @@ tr:nth-child(even){background:#fafafa}
     <tbody id="tbV"><tr><td colspan="5" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 模块2：两市融资余额 -->
+  <!-- 模块2：两市融资余额 (原样保留) -->
   <div class="card">
     <h3>两市融资余额（亿元）</h3>
     <div class="chart-box">
@@ -81,14 +83,14 @@ tr:nth-child(even){background:#fafafa}
     <tbody id="tbM"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 模块3：北向资金（新增） -->
+  <!-- 模块3：北向资金 (按原样代码结构新加) -->
   <div class="card">
     <h3>北向资金净流入（亿元）</h3>
     <div class="chart-box">
       <div class="chart-title">近15日北向资金趋势</div>
       <div class="chart-bars" id="chartN"><div class="chart-ylabels" id="yN"></div></div>
     </div>
-    <table><thead><tr><th>日期</th><th>净流入</th><th>环比增减</th></tr></thead>
+    <table><thead><tr><th>日期</th><th>净买入</th><th>环比增减</th></tr></thead>
     <tbody id="tbN"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
   </div>
 </div>
@@ -235,43 +237,37 @@ async function loadNorth(){
 
 // ---------------- 渲染逻辑 ----------------
 
-function drawChart(containerId, yId, rows, key, isNorth){
+function drawChart(containerId, yId, rows, key){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
   var take = rows.slice(-15);
   if(!take.length){ yLabels.innerHTML=''; return; }
 
   var vals = take.map(function(r){ return r[key]; });
-  var max = 0, min = 0;
-  for(var i=0;i<vals.length;i++){ 
-    if(vals[i]!=null && vals[i]>max) max=vals[i]; 
-    if(vals[i]!=null && vals[i]<min) min=vals[i];
-  }
-  
-  // 确定Y轴范围 (正负对称显示，更适合北向资金)
-  var absMax = Math.max(Math.abs(max), Math.abs(min));
-  if(absMax === 0) absMax = 100; // 默认最小刻度
-  var roundTo = (key === 'total') ? 5000 : (isNorth ? 20 : 500);
-  absMax = Math.ceil(absMax / roundTo) * roundTo;
+  var max = 0;
+  for(var i=0;i<vals.length;i++){ if(vals[i]!=null && vals[i]>max) max=vals[i]; }
+  var roundTo = (key === 'total') ? 5000 : (key === 'val' && yId === 'yN' ? 20 : 500);
+  max = Math.ceil(max / roundTo) * roundTo;
 
-  // Y轴刻度
+  // Y轴刻度 (北向资金如果有负数会自动扩展，正常显示)
   var yHtml = '';
-  var steps = [absMax, Math.round(absMax*0.5), 0, Math.round(-absMax*0.5), -absMax];
+  var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
   yLabels.innerHTML = yHtml;
 
   var html = '';
   for(var i=0;i<take.length;i++){
     var r = take[i];
-    // 计算柱子高度百分比 (基于 -absMax 到 absMax 的绝对范围)
-    var pct = (r[key]!=null && absMax>0) ? ((r[key] + absMax) / (2 * absMax) * 100) : 50;
-    var color = r[key]>=0 ? COLOR_UP : COLOR_DOWN;
+    var prev = (i > 0) ? take[i-1][key] : null;
+    var pct = (r[key]!=null && max>0) ? (r[key]/max*100) : 0;
+    // 北向资金流入红、流出绿；其他资金涨红跌绿
+    var color = (yId === 'yN') ? (r[key]>=0 ? COLOR_UP : COLOR_DOWN) : barColor(r[key], prev);
     var tipText = r.date + '：' + fmt(r[key]) + '亿';
 
     html += '<div class="chart-bar" title="'+tipText+'">';
     html += '  <div class="bar-val">'+(r[key]!=null?fmt(r[key]):'—')+'</div>';
     html += '  <div class="bar-area">';
-    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+';bottom:'+ (r[key]<0 ? pct : '50%') + '"></div>';
+    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'"></div>';
     html += '  </div>';
     html += '  <div class="bar-date">'+r.date.slice(5)+'</div>';
     html += '</div>';
@@ -293,7 +289,7 @@ function renderVolume(shH, szH, today){
   }
   
   CACHE_VOLUME = rows;
-  drawChart('chartV', 'yV', rows, 'total', false);
+  drawChart('chartV', 'yV', rows, 'total');
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -308,7 +304,7 @@ function renderMargin(list){
   if(!list || !list.length) return;
   var rows = list.slice().reverse();
   CACHE_MARGIN = rows;
-  drawChart('chartM', 'yM', rows, 'val', false);
+  drawChart('chartM', 'yM', rows, 'val');
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -323,7 +319,7 @@ function renderNorth(list){
   if(!list || !list.length) return;
   var rows = list.slice().reverse();
   CACHE_NORTH = rows;
-  drawChart('chartN', 'yN', rows, 'val', true);
+  drawChart('chartN', 'yN', rows, 'val');
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -338,7 +334,7 @@ function renderNorth(list){
 function renderCache(){
   if(CACHE_VOLUME) {
     var rows = CACHE_VOLUME.slice();
-    drawChart('chartV', 'yV', rows, 'total', false);
+    drawChart('chartV', 'yV', rows, 'total');
     rows.reverse();
     var h='';
     for(var i=0;i<rows.length;i++){
@@ -350,7 +346,7 @@ function renderCache(){
   }
   if(CACHE_MARGIN) {
     var mRows = CACHE_MARGIN.slice();
-    drawChart('chartM', 'yM', mRows, 'val', false);
+    drawChart('chartM', 'yM', mRows, 'val');
     mRows.reverse();
     var h='';
     for(var i=0;i<mRows.length;i++){
@@ -362,7 +358,7 @@ function renderCache(){
   }
   if(CACHE_NORTH) {
     var nRows = CACHE_NORTH.slice();
-    drawChart('chartN', 'yN', nRows, 'val', true);
+    drawChart('chartN', 'yN', nRows, 'val');
     nRows.reverse();
     var h='';
     for(var i=0;i<nRows.length;i++){
