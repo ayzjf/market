@@ -16,43 +16,50 @@ button:active{background:#fff3d6}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图 ===== */
+/* ===== 柱状图：Grid三行布局 ===== */
 .chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
 .chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
 
-/* 柱子区域容器 */
-.chart-bars{display:flex;align-items:flex-end;height:400px;gap:4px;padding:0 6px;position:relative}
-
-/* 每个柱子整体 */
-.chart-bar{flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;cursor:pointer}
-.chart-bar:hover{opacity:.75}
-
-/* 顶部数值 */
-.chart-bar .bar-val{
-  font-size:11px;color:#333;font-weight:600;white-space:nowrap;
-  min-height:16px;line-height:16px;margin-bottom:4px;
+/* 图表区：数值行 + 柱子行 + 日期行 */
+.chart-bars{
+  display:grid;
+  grid-template-rows: 20px 400px 22px;
+  gap:4px;
+  position:relative;
 }
 
-/* 柱子填充区域（独立，不和日期冲突） */
+/* 每一列（一个日期） */
+.chart-bar{display:contents;cursor:pointer}
+.chart-bar:hover .bar-fill{opacity:.75}
+
+/* 顶部：数值 */
+.chart-bar .bar-val{
+  font-size:11px;color:#333;font-weight:600;white-space:nowrap;
+  text-align:center;align-self:end;padding-bottom:2px;
+}
+
+/* 中间：柱子区域 */
 .chart-bar .bar-area{
-  flex:1;width:100%;position:relative;display:flex;align-items:flex-end;
-  min-height:0; /* 关键：允许flex收缩 */
+  position:relative;width:100%;align-self:stretch;
 }
 
 /* 柱子本体 */
 .chart-bar .bar-fill{
-  width:100%;border-radius:3px 3px 0 0;position:absolute;bottom:0;min-height:3px;
+  width:100%;border-radius:3px 3px 0 0;position:absolute;bottom:0;min-height:2px;
 }
 
-/* 底部日期（在柱子外面，不会被盖住） */
+/* 底部：日期 */
 .chart-bar .bar-date{
   font-size:10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  max-width:100%;text-align:center;margin-top:6px;padding-top:4px;flex-shrink:0;
+  text-align:center;align-self:start;
 }
 
 /* Y轴刻度 */
-.chart-ylabels{position:absolute;left:0;top:0;bottom:24px;display:flex;flex-direction:column;
-  justify-content:space-between;font-size:11px;color:#999;pointer-events:none;z-index:1}
+.chart-ylabels{
+  position:absolute;left:0;top:24px;bottom:26px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  font-size:11px;color:#999;pointer-events:none;z-index:1;
+}
 .chart-ylabels span{transform:translateX(-4px)}
 
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -68,7 +75,7 @@ tr:nth-child(even){background:#fafafa}
 
 @media(max-width:700px){
   .wrap{grid-template-columns:1fr}
-  .chart-bars{height:300px}
+  .chart-bars{grid-template-rows:16px 300px 18px}
   .chart-bar .bar-val{font-size:9px}
   .chart-bar .bar-date{font-size:9px}
 }
@@ -188,7 +195,6 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-/* ===== 画柱状图（拆分为：数值 + 柱子区域 + 日期，三层不重叠） ===== */
 function drawChart(containerId, yId, rows, key){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
