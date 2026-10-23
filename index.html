@@ -83,7 +83,7 @@ tr:nth-child(even){background:#fafafa}
     <tbody id="tbM"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 模块3：北向资金（已修复接口） -->
+  <!-- 模块3：北向资金 -->
   <div class="card">
     <h3>北向资金净流入（亿元）</h3>
     <div class="chart-box">
@@ -203,48 +203,25 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-// 4. 北向资金 (替换为真实有效的接口：陆股通每日成交净买额)
-var NORTH_URL = 'https://data.eastmoney.com/hsgtcg/GetHsgtData?type=1&pageSize=15';
+// 4. 北向资金 (修复：使用官方带有安全令牌的真实有效接口)
+var NORTH_URL = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_MUTUAL_DEAL_HISTORY&columns=TRADE_DATE,NET_DEAL_AMT&source=WEB&sortColumns=TRADE_DATE&sortTypes=-1&pageSize=25&pageNumber=1&token=894050c76af8597a853f5b408b759f5d';
 
 function parseNorth(d){
+  var rows = (d && d.result && d.result.data) || [];
   var out = [];
-  // 兼容不同接口返回的数据结构
-  var rows = [];
-  if(d && d.Data && d.Data.History){
-    rows = d.Data.History;
-  } else if (d && Array.isArray(d)){
-    rows = d;
-  }
-
   for(var i=0;i<rows.length;i++){
     var r = rows[i];
-    var date = '';
-    var v = 0;
-    
-    // 提取日期和净买入额
-    if(r.SHDAY && typeof r.NBDJJ === 'number'){
-      date = String(r.SHDAY); // 接口1格式：SHDAY="20230720", NBDJJ=净买入额(单位:万)
-      v = r.NBDJJ / 10000;   // 转换为亿
-    } else if(r.tradeDate && typeof r.netBuy === 'number'){
-      date = String(r.tradeDate); // 接口2格式
-      v = r.netBuy;
-    } else if(r.TRADE_DATE && typeof r.NET_DEAL_AMT === 'number'){
-      date = String(r.TRADE_DATE).replace(/-/g, '').slice(0,8);
-      v = r.NET_DEAL_AMT / 10000;
-    }
-
-    if(date && date.length >= 8) {
-      // 格式化日期为 YYYY-MM-DD
-      var y = date.slice(0,4), m = date.slice(4,6), d = date.slice(6,8);
-      out.push({date: y+'-'+m+'-'+d, val: v});
-    }
+    var date = r.TRADE_DATE || r.trade_date || '';
+    var v = (r.NET_DEAL_AMT!=null)?r.NET_DEAL_AMT:(r.net_deal_amt!=null?r.net_deal_amt:null);
+    if(date && v!=null) out.push({date:String(date).slice(0,10), val:parseFloat(v)/yi});
   }
   return out;
 }
 
 async function loadNorth(){
+  // 10秒强制超时保护，避免一直卡在加载中
   try{
-    var res = await fetch(NORTH_URL, {cache:'no-cache'});
+    var res = await fetch(NORTH_URL, {cache:'no-cache', signal: AbortSignal.timeout(10000)});
     var d = await res.json();
     var out = parseNorth(d);
     if(out.length) return out;
