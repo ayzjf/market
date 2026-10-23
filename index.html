@@ -281,7 +281,8 @@ function drawChart(containerId, yId, rows, key, isNorth){
     var pos = (val >= 0) ? 'bottom: 0' : `bottom: ${((0 - min) / totalRange * 100)}%`;
 
     html += '<div class="chart-bar" title="'+tipText+'">';
-    html += '  <div class="bar-val">'+(val!=null?fmt(val):'—')+'</div>';
+    // 仅修改了这里，将原来的数字填充替换为空，保持 div 占位不变
+    html += '  <div class="bar-val"></div>';
     html += '  <div class="bar-area" style="justify-content: flex-end; padding-bottom: 0;">';
     html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'; ' + (val<0 ? 'position:absolute; top:'+pct+'%; height:'+(100-pct)+'%; bottom:auto;' : '') + '"></div>';
     html += '  </div>';
