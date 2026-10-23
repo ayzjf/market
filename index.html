@@ -22,18 +22,61 @@ button:active{background:#fff3d6}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图 ===== */
-.chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
+/* ===== 柱状图（全新无重叠布局） ===== */
+.chart-box{padding:16px 15px 10px;border-bottom:1px solid #eee}
 .chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
-.chart-bars{display:flex;align-items:stretch;height:400px;gap:3px;position:relative}
-.chart-bar{flex:1;display:flex;flex-direction:column;justify-content:space-between;min-width:0;cursor:pointer;position:relative}
-.chart-bar:hover{opacity:.85}
-.chart-bar .bar-val{height:22px;display:flex;align-items:flex-end;justify-content:center;font-size:12px;color:#333;font-weight:600;white-space:nowrap}
-.chart-bar .bar-area{flex:1;display:flex;align-items:flex-end;justify-content:center;position:relative}
-.chart-bar .bar-fill{width:100%;border-radius:3px 3px 0 0;min-height:1px}
-.chart-bar .bar-date{height:26px;display:flex;align-items:flex-start;justify-content:center;font-size:12px;color:#333;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.chart-ylabels{position:absolute;left:0;top:0;bottom:26px;display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:#999;pointer-events:none;z-index:10}
-.chart-ylabels span{transform:translateX(-6px)}
+
+/* 容器预留弹窗空间 */
+.chart-bars{display:flex;align-items:flex-end;height:400px;gap:2px;position:relative;padding-top:20px;padding-bottom:35px;}
+.chart-bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-width:0;cursor:pointer;position:relative;transition: opacity 0.2s;}
+.chart-bar:hover{opacity:0.8;}
+
+/* 柱子主体 */
+.chart-bar .bar-area{flex:1;display:flex;align-items:flex-end;justify-content:center;position:relative;width:100%;}
+.chart-bar .bar-fill{width:100%;border-radius:3px 3px 0 0;min-height:1px; transition: background 0.3s;}
+
+/* 底部日期（保持原字号，居中定位） */
+.chart-bar .bar-date{
+  position:absolute;
+  bottom:-30px;
+  width:100%;
+  text-align:center;
+  font-size:11px; /* 保持常规字号 */
+  color:#666;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+/* 交互悬浮提示框 (Tooltip) */
+.tooltip {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 99999;
+  white-space: nowrap;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.8) transparent transparent transparent;
+}
+
+/* 纵轴标签 */
+.chart-ylabels{position:absolute;left:-10px;top:0;bottom:35px;display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:#999;pointer-events:none;z-index:10}
+.chart-ylabels span{transform:translateX(-100%)}
 
 /* 表格部分 */
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -50,8 +93,6 @@ tr:nth-child(even){background:#fafafa}
 @media(max-width:800px){ 
   .wrap{grid-template-columns:1fr}
   .chart-bars{height:300px}
-  .chart-bar .bar-val{font-size:10px;height:18px}
-  .chart-bar .bar-date{font-size:10px;height:22px}
 }
 </style>
 </head>
@@ -97,18 +138,19 @@ tr:nth-child(even){background:#fafafa}
 
 <div class="tip" id="tip">单位：亿元｜北向资金为陆股通净买入｜红涨绿跌（流入为红）</div>
 
+<!-- 全局悬浮提示框 DOM -->
+<div id="chart-tooltip" class="tooltip"></div>
+
 <script>
 var yi = 100000000;
-var COLOR_UP = '#e53935';    // 涨/流入 -> 红
-var COLOR_DOWN = '#2e7d32';  // 跌/流出 -> 绿
-var COLOR_FLAT = '#9e9e9e';  // 平 -> 灰
+var COLOR_UP = '#e53935';    
+var COLOR_DOWN = '#2e7d32';  
+var COLOR_FLAT = '#9e9e9e';  
 
-/* 全局缓存：防止自动刷新失败时页面数据清空 */
 var CACHE_VOLUME = null;
 var CACHE_MARGIN = null;
 var CACHE_NORTH = null;
 
-/* JSONP 请求核心 */
 function jsonp(url, cbName, timeout){
   cbName = cbName || 'cb'; timeout = timeout || 12000;
   return new Promise(function(resolve, reject){
@@ -123,7 +165,6 @@ function jsonp(url, cbName, timeout){
   });
 }
 
-/* 失败重试机制 */
 async function jsonpRetry(url, cbName, retries){
   retries = retries || 2;
   for(var i=0; i<retries; i++){
@@ -132,7 +173,6 @@ async function jsonpRetry(url, cbName, retries){
   }
 }
 
-/* 辅助函数 */
 function fmt(n){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString('zh-CN',{maximumFractionDigits:2}); }
 function diff(cur, prev){
   if(cur==null||prev==null) return {t:'—',c:'dash'};
@@ -145,9 +185,7 @@ function barColor(cur, prev){
   return d>0 ? COLOR_UP : (d<0 ? COLOR_DOWN : COLOR_FLAT);
 }
 
-// ---------------- 获取数据接口 ----------------
-
-// 1. 实时成交额
+// 数据接口函数保持不变...
 async function loadRealtimeVolume(){
   var url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=1.000001,0.399106&fields=f6,f12,f14';
   var d = await jsonpRetry(url, 'cb');
@@ -160,7 +198,6 @@ async function loadRealtimeVolume(){
   return { sh:sh==null?null:sh/yi, sz:sz==null?null:sz/yi };
 }
 
-// 2. 成交额历史
 async function loadVolumeHistory(secid){
   var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid='+secid
           + '&fields1=f1,f2,f3&fields2=f51,f57&klt=101&fqt=1&end=20500101&lmt=25';
@@ -171,7 +208,6 @@ async function loadVolumeHistory(secid){
   return out;
 }
 
-// 3. 融资余额
 var MARGIN_URL = 'https://datacenter-web.eastmoney.com/api/data/v1/get'
   + '?reportName=RPTA_RZRQ_LSHJ&columns=DIM_DATE,RZYE&source=WEB'
   + '&sortColumns=DIM_DATE&sortTypes=-1&pageSize=25&pageNumber=1';
@@ -203,11 +239,9 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-// 4. 北向资金 (纯内嵌真实模拟数据，永不卡死)
 function loadNorth(){
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      // 模拟近15日极像真实的行情（含红涨绿跌）
       var mockData = [
         {"date": "2026-10-23", "val": -12.30},
         {"date": "2026-10-22", "val": -48.56},
@@ -231,15 +265,13 @@ function loadNorth(){
   });
 }
 
-// ---------------- 渲染逻辑 ----------------
-
+/* ===== 核心渲染逻辑（交互式弹窗版） ===== */
 function drawChart(containerId, yId, rows, key, isNorth){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
   var take = rows.slice(-15);
   if(!take.length){ yLabels.innerHTML=''; return; }
 
-  // 寻找最小值和最大值（兼容北向资金的负数/零轴显示）
   var min = 0, max = 0;
   for(var i=0;i<take.length;i++){ 
     if(take[i][key] != null){
@@ -253,42 +285,74 @@ function drawChart(containerId, yId, rows, key, isNorth){
   min = Math.floor(min / roundTo) * roundTo;
   if(max === 0) max = roundTo;
   if(min === 0) min = -roundTo;
-
   var totalRange = max - min;
 
+  // 绘制纵轴
   var yHtml = '';
-  var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
-  if(min < 0) steps.push(Math.round(min*0.25), Math.round(min*0.5));
+  var steps = [max, Math.round((max+min)/2), 0];
+  if(min < 0) steps.push(Math.round(min*0.5));
+  steps = steps.filter((v, i, a) => a.indexOf(v) === i);
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
   yLabels.innerHTML = yHtml;
 
   var html = '';
   for(var i=0;i<take.length;i++){
     var r = take[i];
-    var prev = (i > 0) ? take[i-1][key] : null;
     var val = r[key];
     var pct = 0;
-    
-    // 如果有负数，计算相对零轴的高度
     if(totalRange !== 0 && val != null){
       pct = (val - min) / totalRange * 100;
     }
 
-    // 颜色逻辑：北向资金流入为红，流出为绿
+    var prev = (i > 0) ? take[i-1][key] : null;
     var color = isNorth ? (val >= 0 ? COLOR_UP : COLOR_DOWN) : barColor(val, prev);
     
+    // 交互提示框信息
     var tipText = r.date + '：' + fmt(val) + '亿';
-    var pos = (val >= 0) ? 'bottom: 0' : `bottom: ${((0 - min) / totalRange * 100)}%`;
-
-    html += '<div class="chart-bar" title="'+tipText+'">';
-    html += '  <div class="bar-val">'+(val!=null?fmt(val):'—')+'</div>';
-    html += '  <div class="bar-area" style="justify-content: flex-end; padding-bottom: 0;">';
-    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'; ' + (val<0 ? 'position:absolute; top:'+pct+'%; height:'+(100-pct)+'%; bottom:auto;' : '') + '"></div>';
+    
+    // 处理负数柱子位置
+    var style = '';
+    if(val < 0){
+        style = `position:absolute; top:${pct}%; height:${100-pct}%; bottom:auto;`;
+    }
+    
+    html += '<div class="chart-bar" data-val="'+tipText+'">';
+    html += '  <div class="bar-area">';
+    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'; '+style+'"></div>';
     html += '  </div>';
+    // 保留原字号的底部日期
     html += '  <div class="bar-date">'+r.date.slice(5)+'</div>';
     html += '</div>';
   }
   container.innerHTML = html;
+  initTooltip();
+}
+
+/* 悬浮提示框交互事件绑定 */
+function initTooltip(){
+  var tooltip = document.getElementById('chart-tooltip');
+  var bars = document.querySelectorAll('.chart-bar');
+  
+  function show(e){
+    tooltip.textContent = this.getAttribute('data-val');
+    tooltip.style.display = 'block';
+    move(e);
+  }
+  function move(e){
+    var x = e.touches ? e.touches[0].pageX : e.pageX;
+    var y = e.touches ? e.touches[0].pageY : e.pageY;
+    tooltip.style.left = (x - tooltip.offsetWidth / 2) + 'px';
+    tooltip.style.top = (y - tooltip.offsetHeight - 15) + 'px';
+  }
+  function hide(){ tooltip.style.display = 'none'; }
+
+  bars.forEach(function(bar){
+    bar.addEventListener('mouseenter', show);
+    bar.addEventListener('mousemove', move);
+    bar.addEventListener('mouseleave', hide);
+    bar.addEventListener('touchstart', show, {passive: true});
+    bar.addEventListener('touchend', hide);
+  });
 }
 
 function renderVolume(shH, szH, today){
@@ -346,7 +410,6 @@ function renderNorth(list){
   document.getElementById('tbN').innerHTML=h;
 }
 
-/* 渲染缓存（当获取失败时调用，绝不黑屏） */
 function renderCache(){
   if(CACHE_VOLUME) {
     var rows = CACHE_VOLUME.slice();
@@ -386,11 +449,9 @@ function renderCache(){
   }
 }
 
-// 主加载函数
 async function loadAll(){
   var tip=document.getElementById('tip'), errs=[];
   
-  // 1. 加载成交额
   try{
     var shH=await loadVolumeHistory('1.000001');
     var szH=await loadVolumeHistory('0.399106');
@@ -399,11 +460,9 @@ async function loadAll(){
     renderVolume(shH, szH, today);
   }catch(e){ errs.push('成交额'); renderCache(); }
   
-  // 2. 加载融资余额
   try{ renderMargin(await loadMargin()); }
   catch(e){ errs.push('融资'); renderCache(); }
 
-  // 3. 加载北向资金 (直接加载本地内嵌数据，秒出)
   try{ renderNorth(await loadNorth()); }
   catch(e){ errs.push('北向'); renderCache(); }
   
@@ -417,9 +476,8 @@ async function loadAll(){
   }
 }
 
-// 启动及自动刷新
 loadAll();
-setInterval(loadAll, 180000); // 3分钟自动刷新
+setInterval(loadAll, 180000);
 document.addEventListener('visibilitychange', function(){ if(!document.hidden) loadAll(); });
 </script>
 </body>
