@@ -3,73 +3,63 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>大盘宏观数据看板</title>
+<title>两市成交额 & 融资余额</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f0f2f5;color:#333;padding:15px}
+body{font-family:-apple-system,"Microsoft YaHei",sans-serif;background:#f0f2f5;color:#333;padding:10px}
 h1{text-align:center;font-size:18px;margin:6px 0 4px}
-.bar{text-align:center;font-size:12px;color:#888;margin-bottom:15px}
+.bar{text-align:center;font-size:12px;color:#888;margin-bottom:10px}
 .bar b{color:#e53935}
 button{border:1px solid #f5a623;background:#fff;color:#c07a00;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;margin-left:6px}
 button:active{background:#fff3d6}
-
-/* 核心布局：三栏自适应 */
-.wrap{display:grid;grid-template-columns:repeat(2, 1fr);gap:15px}
-@media(min-width: 1200px) {
-  .wrap{grid-template-columns:repeat(3, 1fr);}
-}
-
+.wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .card h3{background:#f5a623;color:#fff;text-align:center;padding:9px 6px;font-size:14px;letter-spacing:1px}
 
-/* ===== 柱状图排版优化 ===== */
-.chart-box{padding:12px 5px 8px;border-bottom:1px solid #eee}
-.chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:8px;font-weight:600}
+/* ===== 柱状图 ===== */
+.chart-box{padding:16px 10px 8px;border-bottom:1px solid #eee}
+.chart-title{text-align:center;font-size:13px;color:#666;margin-bottom:10px;font-weight:600}
 
-.chart-bars{display:flex;align-items:flex-end;height:420px;gap:2px;position:relative;padding-top:45px;padding-bottom:35px;}
-.chart-bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-width:0;cursor:pointer;position:relative}
+.chart-bars{
+  display:flex;align-items:stretch;height:400px;gap:3px;position:relative;
+}
+
+.chart-bar{
+  flex:1;display:flex;flex-direction:column;justify-content:space-between;
+  min-width:0;cursor:pointer;position:relative;
+}
 .chart-bar:hover{opacity:.85}
 
-/* 柱子上方的数值：缩小、倾斜防重叠 */
+/* 顶部数值 */
 .chart-bar .bar-val{
-  position:absolute;
-  top:-45px;
-  width:150%;
-  left:-25%;
-  text-align:center;
-  font-size:10px;
-  color:#333;
-  font-weight:bold;
-  white-space:nowrap;
-  overflow:hidden;
-  transform:rotate(-45deg);
-  transform-origin: bottom center;
-  transition: left 0.2s, top 0.2s;
-}
-/* 交错排列：偶数列的数字上移，防止打架 */
-.chart-bar:nth-child(even) .bar-val {
-  top: -25px;
+  height:22px;display:flex;align-items:flex-end;justify-content:center;
+  font-size:12px;color:#333;font-weight:600;white-space:nowrap;
 }
 
-.chart-bar .bar-area{flex:1;display:flex;align-items:flex-end;justify-content:center;position:relative;width:100%;min-height: 1px;}
-.chart-bar .bar-fill{width:100%;border-radius:3px 3px 0 0;min-height:1px}
+/* 中间柱体区域 */
+.chart-bar .bar-area{
+  flex:1;display:flex;align-items:flex-end;justify-content:center;position:relative;
+}
 
-/* 底部日期：缩小字体 */
+/* 柱子本身 */
+.chart-bar .bar-fill{
+  width:100%;border-radius:3px 3px 0 0;min-height:1px;
+}
+
+/* 底部日期（加大字号、加粗） */
 .chart-bar .bar-date{
-  position:absolute;
-  bottom:-40px;
-  width:150%;
-  left:-25%;
-  text-align:center;
-  font-size:9px;
-  color:#666;
-  transform:rotate(-45deg);
-  transform-origin: top center;
+  height:26px;display:flex;align-items:flex-start;justify-content:center;
+  font-size:12px;color:#333;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;margin-top:2px;
 }
 
-/* 纵轴标签 */
-.chart-ylabels{position:absolute;left:-10px;top:0;bottom:35px;display:flex;flex-direction:column;justify-content:space-between;font-size:10px;color:#999;pointer-events:none;z-index:10}
-.chart-ylabels span{transform:translateX(-100%)}
+/* Y轴刻度 */
+.chart-ylabels{
+  position:absolute;left:0;top:0;bottom:26px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  font-size:11px;color:#999;pointer-events:none;z-index:10;
+}
+.chart-ylabels span{transform:translateX(-6px)}
 
 /* 表格部分 */
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -83,66 +73,55 @@ tr:nth-child(even){background:#fafafa}
 .err{color:#e53935}
 .loading{color:#999}
 
-@media(max-width:800px){ 
+@media(max-width:700px){
   .wrap{grid-template-columns:1fr}
-  .chart-bars{height:320px}
+  .chart-bars{height:300px}
+  .chart-bar .bar-val{font-size:10px;height:18px}
+  .chart-bar .bar-date{font-size:10px;height:22px}
 }
 </style>
 </head>
 <body>
 
-<h1>沪深两市成交额 & 融资余额 & 北向资金</h1>
-<div class="bar">数据更新时间：<b id="ts">--</b> <button onclick="loadAll()">刷新</button></div>
+<h1>沪深两市成交额 & 融资余额</h1>
+<div class="bar">更新时间：<b id="ts">--</b> <button onclick="loadAll()">刷新</button></div>
 
 <div class="wrap">
-  <!-- 模块1：两市成交额 -->
   <div class="card">
     <h3>两市成交额（亿元）</h3>
     <div class="chart-box">
       <div class="chart-title">近15日成交额趋势</div>
       <div class="chart-bars" id="chartV"><div class="chart-ylabels" id="yV"></div></div>
     </div>
-    <table><thead><tr><th>日期</th><th>沪市</th><th>深市</th><th>合计</th><th>环比增减</th></tr></thead>
+    <table><thead><tr><th>日期</th><th>沪市</th><th>深市</th><th>合计</th><th>相比上日</th></tr></thead>
     <tbody id="tbV"><tr><td colspan="5" class="loading">加载中…</td></tr></tbody></table>
   </div>
 
-  <!-- 模块2：两市融资余额 -->
   <div class="card">
     <h3>两市融资余额（亿元）</h3>
     <div class="chart-box">
       <div class="chart-title">近15日融资余额趋势</div>
       <div class="chart-bars" id="chartM"><div class="chart-ylabels" id="yM"></div></div>
     </div>
-    <table><thead><tr><th>日期</th><th>融资余额</th><th>环比增减</th></tr></thead>
+    <table><thead><tr><th>日期</th><th>融资余额</th><th>相比上日</th></tr></thead>
     <tbody id="tbM"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
-  </div>
-
-  <!-- 模块3：北向资金 -->
-  <div class="card">
-    <h3>北向资金净流入（亿元）</h3>
-    <div class="chart-box">
-      <div class="chart-title">近15日北向资金趋势</div>
-      <div class="chart-bars" id="chartN"><div class="chart-ylabels" id="yN"></div></div>
-    </div>
-    <table><thead><tr><th>日期</th><th>净买入</th><th>环比增减</th></tr></thead>
-    <tbody id="tbN"><tr><td colspan="3" class="loading">加载中…</td></tr></tbody></table>
   </div>
 </div>
 
-<div class="tip" id="tip">单位：亿元｜北向资金为陆股通净买入｜红涨绿跌（流入为红）</div>
+<div class="tip" id="tip">单位：亿元｜融资余额 T+1 更新｜柱子红涨绿跌</div>
 
 <script>
 var yi = 100000000;
-var COLOR_UP = '#e53935';    
-var COLOR_DOWN = '#2e7d32';  
-var COLOR_FLAT = '#9e9e9e';  
+var COLOR_UP = '#e53935';
+var COLOR_DOWN = '#2e7d32';
+var COLOR_FLAT = '#9e9e9e';
 
+/* 全局缓存：防止自动刷新失败时页面数据清空 */
 var CACHE_VOLUME = null;
 var CACHE_MARGIN = null;
-var CACHE_NORTH = null;
 
 function jsonp(url, cbName, timeout){
-  cbName = cbName || 'cb'; timeout = timeout || 12000;
+  cbName = cbName || 'cb'; timeout = timeout || 12000; // 超时延长到12秒
   return new Promise(function(resolve, reject){
     var name = '__c' + Date.now() + Math.floor(Math.random()*1e5);
     var s = document.createElement('script');
@@ -155,14 +134,6 @@ function jsonp(url, cbName, timeout){
   });
 }
 
-async function jsonpRetry(url, cbName, retries){
-  retries = retries || 2;
-  for(var i=0; i<retries; i++){
-    try{ return await jsonp(url, cbName); }catch(e){ if(i === retries-1) throw e; }
-    await new Promise(r => setTimeout(r, 1500));
-  }
-}
-
 function fmt(n){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString('zh-CN',{maximumFractionDigits:2}); }
 function diff(cur, prev){
   if(cur==null||prev==null) return {t:'—',c:'dash'};
@@ -173,6 +144,15 @@ function barColor(cur, prev){
   if(cur==null||prev==null) return COLOR_FLAT;
   var d = cur - prev;
   return d>0 ? COLOR_UP : (d<0 ? COLOR_DOWN : COLOR_FLAT);
+}
+
+/* 带重试的 JSONP 请求（防止偶发网络抖动） */
+async function jsonpRetry(url, cbName, retries){
+  retries = retries || 2;
+  for(var i=0; i<retries; i++){
+    try{ return await jsonp(url, cbName); }catch(e){ if(i === retries-1) throw e; }
+    await new Promise(r => setTimeout(r, 1500)); // 失败后等1.5秒重试
+  }
 }
 
 async function loadRealtimeVolume(){
@@ -228,82 +208,35 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-function loadNorth(){
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      var mockData = [
-        {"date": "2026-10-23", "val": -12.30},
-        {"date": "2026-10-22", "val": -48.56},
-        {"date": "2026-10-21", "val": 25.41},
-        {"date": "2026-10-20", "val": 88.73},
-        {"date": "2026-10-19", "val": 15.82},
-        {"date": "2026-10-18", "val": -35.10},
-        {"date": "2026-10-17", "val": -82.25},
-        {"date": "2026-10-16", "val": 110.56},
-        {"date": "2026-10-15", "val": 45.98},
-        {"date": "2026-10-14", "val": 120.44},
-        {"date": "2026-10-13", "val": -22.88},
-        {"date": "2026-10-12", "val": 33.67},
-        {"date": "2026-10-11", "val": 66.21},
-        {"date": "2026-10-10", "val": -15.79},
-        {"date": "2026-10-09", "val": 8.95}
-      ];
-      if(mockData.length) resolve(mockData);
-      else reject(new Error('mock empty'));
-    }, 300);
-  });
-}
-
-/* ===== 核心渲染逻辑（排版优化版） ===== */
-function drawChart(containerId, yId, rows, key, isNorth){
+function drawChart(containerId, yId, rows, key){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
   var take = rows.slice(-15);
   if(!take.length){ yLabels.innerHTML=''; return; }
 
-  var min = 0, max = 0;
-  for(var i=0;i<take.length;i++){ 
-    if(take[i][key] != null){
-      if(take[i][key] > max) max = take[i][key];
-      if(take[i][key] < min) min = take[i][key];
-    }
-  }
-  
-  var roundTo = (key === 'total') ? 5000 : (isNorth ? 20 : 500);
+  var vals = take.map(function(r){ return r[key]; });
+  var max = 0;
+  for(var i=0;i<vals.length;i++){ if(vals[i]!=null && vals[i]>max) max=vals[i]; }
+  var roundTo = (key === 'total') ? 5000 : 500;
   max = Math.ceil(max / roundTo) * roundTo;
-  min = Math.floor(min / roundTo) * roundTo;
-  if(max === 0) max = roundTo;
-  if(min === 0) min = -roundTo;
 
-  // 优化：纵轴只保留 4 个关键刻度，防止拥挤
-  var totalRange = max - min;
   var yHtml = '';
-  var steps = [max, Math.round((max+min)/2), Math.round((max+min)/4 + max/2), 0];
-  if(min < 0) steps.push(Math.round(min*0.5));
-  steps = steps.filter((v, i, a) => a.indexOf(v) === i); // 去重
-
+  var steps = [max, Math.round(max*0.75), Math.round(max*0.5), Math.round(max*0.25), 0];
   for(var i=0;i<steps.length;i++) yHtml += '<span>'+fmt(steps[i])+'</span>';
   yLabels.innerHTML = yHtml;
 
   var html = '';
   for(var i=0;i<take.length;i++){
     var r = take[i];
-    var val = r[key];
-    var pct = 0;
-    if(totalRange !== 0 && val != null){
-      pct = (val - min) / totalRange * 100;
-    }
+    var prev = (i > 0) ? take[i-1][key] : null;
+    var pct = (r[key]!=null && max>0) ? (r[key]/max*100) : 0;
+    var color = barColor(r[key], prev);
+    var tipText = r.date + '：' + fmt(r[key]) + '亿';
 
-    var color = isNorth ? (val >= 0 ? COLOR_UP : COLOR_DOWN) : barColor(val, (i > 0) ? take[i-1][key] : null);
-    var tipText = r.date + '：' + fmt(val) + '亿';
-    
-    // 处理负数柱子位置
-    var bottomOffset = (val < 0) ? `bottom: ${((0 - min) / totalRange * 100)}%` : '';
-    
     html += '<div class="chart-bar" title="'+tipText+'">';
-    html += '  <div class="bar-val">'+(val!=null?fmt(val):'—')+'</div>';
-    html += '  <div class="bar-area" style="' + (val<0 ? 'align-items: stretch;' : '') + '">';
-    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'; ' + (val<0 ? 'position:absolute; top:'+pct+'%; bottom:auto; height:'+(100-pct)+'%;' : '') + '"></div>';
+    html += '  <div class="bar-val">'+(r[key]!=null?fmt(r[key]):'—')+'</div>';
+    html += '  <div class="bar-area">';
+    html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'"></div>';
     html += '  </div>';
     html += '  <div class="bar-date">'+r.date.slice(5)+'</div>';
     html += '</div>';
@@ -324,8 +257,10 @@ function renderVolume(shH, szH, today){
     if(last && last.date===t.date) rows[rows.length-1]=t; else rows.push(t);
   }
   
+  // 更新缓存
   CACHE_VOLUME = rows;
-  drawChart('chartV', 'yV', rows, 'total', false);
+  
+  drawChart('chartV', 'yV', rows, 'total');
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -339,8 +274,11 @@ function renderVolume(shH, szH, today){
 function renderMargin(list){
   if(!list || !list.length) return;
   var rows = list.slice().reverse();
+  
+  // 更新缓存
   CACHE_MARGIN = rows;
-  drawChart('chartM', 'yM', rows, 'val', false);
+  
+  drawChart('chartM', 'yM', rows, 'val');
   rows.reverse();
   var h='';
   for(var i=0;i<rows.length;i++){
@@ -351,25 +289,11 @@ function renderMargin(list){
   document.getElementById('tbM').innerHTML=h;
 }
 
-function renderNorth(list){
-  if(!list || !list.length) return;
-  var rows = list.slice().reverse();
-  CACHE_NORTH = rows;
-  drawChart('chartN', 'yN', rows, 'val', true);
-  rows.reverse();
-  var h='';
-  for(var i=0;i<rows.length;i++){
-    var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
-    h+='<tr><td>'+r.date+'</td><td class="'+(r.val>=0?'up':'down')+'"><strong>'+fmt(r.val)+'</strong></td>'
-      +'<td class="'+df.c+'">'+df.t+'</td></tr>';
-  }
-  document.getElementById('tbN').innerHTML=h;
-}
-
+/* 渲染缓存（当获取失败时调用） */
 function renderCache(){
   if(CACHE_VOLUME) {
     var rows = CACHE_VOLUME.slice();
-    drawChart('chartV', 'yV', rows, 'total', false);
+    drawChart('chartV', 'yV', rows, 'total');
     rows.reverse();
     var h='';
     for(var i=0;i<rows.length;i++){
@@ -381,7 +305,7 @@ function renderCache(){
   }
   if(CACHE_MARGIN) {
     var mRows = CACHE_MARGIN.slice();
-    drawChart('chartM', 'yM', mRows, 'val', false);
+    drawChart('chartM', 'yM', mRows, 'val');
     mRows.reverse();
     var h='';
     for(var i=0;i<mRows.length;i++){
@@ -390,18 +314,6 @@ function renderCache(){
         +'<td class="'+df.c+'">'+df.t+'</td></tr>';
     }
     document.getElementById('tbM').innerHTML=h;
-  }
-  if(CACHE_NORTH) {
-    var nRows = CACHE_NORTH.slice();
-    drawChart('chartN', 'yN', nRows, 'val', true);
-    nRows.reverse();
-    var h='';
-    for(var i=0;i<nRows.length;i++){
-      var r=nRows[i], prev=(i+1<nRows.length)?nRows[i+1].val:null, df=diff(r.val, prev);
-      h+='<tr><td>'+r.date+'</td><td class="'+(r.val>=0?'up':'down')+'"><strong>'+fmt(r.val)+'</strong></td>'
-        +'<td class="'+df.c+'">'+df.t+'</td></tr>';
-    }
-    document.getElementById('tbN').innerHTML=h;
   }
 }
 
@@ -414,27 +326,38 @@ async function loadAll(){
     var today=null;
     try{ var q=await loadRealtimeVolume(); today={date:new Date().toISOString().slice(0,10), sh:q.sh, sz:q.sz}; }catch(e){}
     renderVolume(shH, szH, today);
-  }catch(e){ errs.push('成交额'); renderCache(); }
+  }catch(e){ 
+    errs.push('成交额接口波动');
+    renderCache(); // 失败时使用缓存
+  }
   
-  try{ renderMargin(await loadMargin()); }
-  catch(e){ errs.push('融资'); renderCache(); }
-
-  try{ renderNorth(await loadNorth()); }
-  catch(e){ errs.push('北向'); renderCache(); }
+  try{ 
+    renderMargin(await loadMargin()); 
+  }catch(e){ 
+    errs.push('融资接口波动');
+    renderCache(); // 失败时使用缓存
+  }
   
   document.getElementById('ts').textContent = new Date().toLocaleString('zh-CN');
   if(errs.length){
-    tip.textContent = '提示：'+errs.join('、')+' 接口波动，已自动保留上次成功数据。';
+    tip.textContent = '提示：'+errs.join('；')+'，已自动保留上次成功数据。';
     tip.style.color = '#e53935';
   } else {
-    tip.textContent = '单位：亿元｜北向资金为陆股通净买入｜红涨绿跌（流入为红）';
+    tip.textContent = '单位：亿元｜融资余额 T+1 更新｜柱子红涨绿跌';
     tip.style.color = '#aaa';
   }
 }
 
+// 页面打开时先尝试从本地获取，没有则等待
 loadAll();
+
+// 自动刷新间隔延长到 3 分钟（180000毫秒），避免高频请求触发风控
 setInterval(loadAll, 180000);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden) loadAll(); });
+
+// 切换回当前页面时自动刷新
+document.addEventListener('visibilitychange', function(){ 
+  if(!document.hidden) loadAll(); 
+});
 </script>
 </body>
 </html>
