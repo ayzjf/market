@@ -65,7 +65,7 @@ tr:nth-child(even){background:#fafafa}
   <div class="card">
     <h3>两市成交额（亿元）</h3>
     <div class="chart-box">
-      <div class="chart-title">近15日成交额趋势</div>
+      <div class="chart-title">近20日成交额趋势</div>
       <div class="chart-bars" id="chartV"><div class="chart-ylabels" id="yV"></div></div>
     </div>
     <table><thead><tr><th>日期</th><th>沪市</th><th>深市</th><th>合计</th><th>环比增减</th></tr></thead>
@@ -76,7 +76,7 @@ tr:nth-child(even){background:#fafafa}
   <div class="card">
     <h3>两市融资余额（亿元）</h3>
     <div class="chart-box">
-      <div class="chart-title">近15日融资余额趋势</div>
+      <div class="chart-title">近20日融资余额趋势</div>
       <div class="chart-bars" id="chartM"><div class="chart-ylabels" id="yM"></div></div>
     </div>
     <table><thead><tr><th>日期</th><th>融资余额</th><th>环比增减</th></tr></thead>
@@ -87,7 +87,7 @@ tr:nth-child(even){background:#fafafa}
   <div class="card">
     <h3>北向资金净流入（亿元）</h3>
     <div class="chart-box">
-      <div class="chart-title">近15日北向资金趋势</div>
+      <div class="chart-title">近20日北向资金趋势</div>
       <div class="chart-bars" id="chartN"><div class="chart-ylabels" id="yN"></div></div>
     </div>
     <table><thead><tr><th>日期</th><th>净买入</th><th>环比增减</th></tr></thead>
@@ -203,11 +203,11 @@ async function loadMargin(){
   throw new Error('融资余额获取失败');
 }
 
-// 4. 北向资金 (纯内嵌真实模拟数据，永不卡死)
+// 4. 北向资金 (纯内嵌真实模拟数据，已扩充至20天以上)
 function loadNorth(){
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      // 模拟近15日极像真实的行情（含红涨绿跌）
+      // 模拟近20日极像真实的行情（含红涨绿跌）
       var mockData = [
         {"date": "2026-10-23", "val": -12.30},
         {"date": "2026-10-22", "val": -48.56},
@@ -223,7 +223,12 @@ function loadNorth(){
         {"date": "2026-10-12", "val": 33.67},
         {"date": "2026-10-11", "val": 66.21},
         {"date": "2026-10-10", "val": -15.79},
-        {"date": "2026-10-09", "val": 8.95}
+        {"date": "2026-10-09", "val": 8.95},
+        {"date": "2026-10-08", "val": -5.20},
+        {"date": "2026-09-30", "val": 42.15},
+        {"date": "2026-09-29", "val": -18.76},
+        {"date": "2026-09-28", "val": 12.33},
+        {"date": "2026-09-25", "val": 55.00}
       ];
       if(mockData.length) resolve(mockData);
       else reject(new Error('mock empty'));
@@ -236,7 +241,8 @@ function loadNorth(){
 function drawChart(containerId, yId, rows, key, isNorth){
   var container = document.getElementById(containerId);
   var yLabels = document.getElementById(yId);
-  var take = rows.slice(-15);
+  // 修改为截取最后20条
+  var take = rows.slice(-20);
   if(!take.length){ yLabels.innerHTML=''; return; }
 
   // 寻找最小值和最大值（兼容北向资金的负数/零轴显示）
@@ -278,10 +284,9 @@ function drawChart(containerId, yId, rows, key, isNorth){
     var color = isNorth ? (val >= 0 ? COLOR_UP : COLOR_DOWN) : barColor(val, prev);
     
     var tipText = r.date + '：' + fmt(val) + '亿';
-    var pos = (val >= 0) ? 'bottom: 0' : `bottom: ${((0 - min) / totalRange * 100)}%`;
 
     html += '<div class="chart-bar" title="'+tipText+'">';
-    // 仅修改了这里，将原来的数字填充替换为空，保持 div 占位不变
+    // 数字置空，保持占位
     html += '  <div class="bar-val"></div>';
     html += '  <div class="bar-area" style="justify-content: flex-end; padding-bottom: 0;">';
     html += '    <div class="bar-fill" style="height:'+pct+'%;background:'+color+'; ' + (val<0 ? 'position:absolute; top:'+pct+'%; height:'+(100-pct)+'%; bottom:auto;' : '') + '"></div>';
@@ -309,7 +314,8 @@ function renderVolume(shH, szH, today){
   drawChart('chartV', 'yV', rows, 'total', false);
   rows.reverse();
   var h='';
-  for(var i=0;i<rows.length;i++){
+  var limit = Math.min(rows.length, 20); // 限制表格显示20条
+  for(var i=0;i<limit;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].total:null, df=diff(r.total, prev);
     h+='<tr><td>'+r.date+'</td><td>'+fmt(r.sh)+'</td><td>'+fmt(r.sz)+'</td>'
       +'<td><strong>'+fmt(r.total)+'</strong></td><td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -324,7 +330,8 @@ function renderMargin(list){
   drawChart('chartM', 'yM', rows, 'val', false);
   rows.reverse();
   var h='';
-  for(var i=0;i<rows.length;i++){
+  var limit = Math.min(rows.length, 20); // 限制表格显示20条
+  for(var i=0;i<limit;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
     h+='<tr><td>'+r.date+'</td><td><strong>'+fmt(r.val)+'</strong></td>'
       +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -339,7 +346,8 @@ function renderNorth(list){
   drawChart('chartN', 'yN', rows, 'val', true);
   rows.reverse();
   var h='';
-  for(var i=0;i<rows.length;i++){
+  var limit = Math.min(rows.length, 20); // 限制表格显示20条
+  for(var i=0;i<limit;i++){
     var r=rows[i], prev=(i+1<rows.length)?rows[i+1].val:null, df=diff(r.val, prev);
     h+='<tr><td>'+r.date+'</td><td class="'+(r.val>=0?'up':'down')+'"><strong>'+fmt(r.val)+'</strong></td>'
       +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -354,7 +362,8 @@ function renderCache(){
     drawChart('chartV', 'yV', rows, 'total', false);
     rows.reverse();
     var h='';
-    for(var i=0;i<rows.length;i++){
+    var limit = Math.min(rows.length, 20); // 限制显示20条
+    for(var i=0;i<limit;i++){
       var r=rows[i], prev=(i+1<rows.length)?rows[i+1].total:null, df=diff(r.total, prev);
       h+='<tr><td>'+r.date+'</td><td>'+fmt(r.sh)+'</td><td>'+fmt(r.sz)+'</td>'
         +'<td><strong>'+fmt(r.total)+'</strong></td><td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -366,7 +375,8 @@ function renderCache(){
     drawChart('chartM', 'yM', mRows, 'val', false);
     mRows.reverse();
     var h='';
-    for(var i=0;i<mRows.length;i++){
+    var limit = Math.min(mRows.length, 20); // 限制显示20条
+    for(var i=0;i<limit;i++){
       var r=mRows[i], prev=(i+1<mRows.length)?mRows[i+1].val:null, df=diff(r.val, prev);
       h+='<tr><td>'+r.date+'</td><td><strong>'+fmt(r.val)+'</strong></td>'
         +'<td class="'+df.c+'">'+df.t+'</td></tr>';
@@ -378,7 +388,8 @@ function renderCache(){
     drawChart('chartN', 'yN', nRows, 'val', true);
     nRows.reverse();
     var h='';
-    for(var i=0;i<nRows.length;i++){
+    var limit = Math.min(nRows.length, 20); // 限制显示20条
+    for(var i=0;i<limit;i++){
       var r=nRows[i], prev=(i+1<nRows.length)?nRows[i+1].val:null, df=diff(r.val, prev);
       h+='<tr><td>'+r.date+'</td><td class="'+(r.val>=0?'up':'down')+'"><strong>'+fmt(r.val)+'</strong></td>'
         +'<td class="'+df.c+'">'+df.t+'</td></tr>';
